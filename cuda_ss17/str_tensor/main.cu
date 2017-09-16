@@ -204,10 +204,6 @@ int main(int argc, char **argv)
     // This happens on the very first call to a CUDA function, and takes some time (around half a second)
     // We will do it right here, so that the run time measurements are accurate
     cudaDeviceSynchronize();  CUDA_CHECK;
-
-
-
-
     // Reading command line parameters:
     // getParam("param", var, argc, argv) looks whether "-param xyz" is specified, and if so stores the value "xyz" in "var"
     // If "-param" is not specified, the value of "var" remains unchanged

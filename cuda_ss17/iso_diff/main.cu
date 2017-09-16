@@ -306,7 +306,18 @@ int main(int argc, char **argv)
     //mTimer.end();  t = mTimer.get();  // elapsed time in seconds
     //l2norm<<<grid, block>>>(div_vec, result, w, h, nc);
 
+
+
+
+
+
+    // show output image: first convert to interleaved opencv format from the layered raw array
     cudaMemcpy( imgOut, d_imgIn, w*h*nc*sizeof(float), cudaMemcpyDeviceToHost );CUDA_CHECK;
+    // show input image
+    showImage("Input", mIn, 100, 100);  // show at position (x_from_left=100,y_from_above=100)
+        
+    convert_layered_to_mat(mOut, imgOut);
+    showImage("Output", mOut, 100+w+40, 100);
 
     cudaFree(d_imgOut);CUDA_CHECK;
     cudaFree(dx_a);CUDA_CHECK;
@@ -318,17 +329,6 @@ int main(int argc, char **argv)
     //timer.end();  float t = timer.get();  // elapsed time in seconds
     //cout << "time: " << t*1000 << " ms" << endl;
 
-
-
-
-
-
-    // show input image
-    showImage("Input", mIn, 100, 100);  // show at position (x_from_left=100,y_from_above=100)
-
-    // show output image: first convert to interleaved opencv format from the layered raw array
-    convert_layered_to_mat(mOut, imgOut);
-    showImage("Output", mOut, 100+w+40, 100);
 
     // ### Display your own output images here as needed
 

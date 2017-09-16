@@ -10,6 +10,7 @@
 #define _USE_MATH_DEFINES
 #include "helper.h"
 #include <iostream>
+#include <stdio.h>
 #include <math.h>
 using namespace std;
 
@@ -54,6 +55,7 @@ void compute_eig(float *eigvec_1, float *eigvec_2, float a, float b, float c, fl
         eigvec_2[0] = 1;
         eigvec_2[1] = 0;
     }
+    
 }
 
 __global__
@@ -89,6 +91,7 @@ void div(float *div_vec, float *dx_a, float *dy_a, int dimx, int dimy, int nc)
         if(i > 0) tempx=(dx_a[ind]-dx_a[ind-1]);
         if(j > 0 ) tempy=(dy_a[ind]-dy_a[ind-dimx]);
         div_vec[ind] = tempx + tempy;
+        printf("Divergence in thread 0 is %f\n", div_vec[ind]);
     }
 }
 
@@ -102,7 +105,13 @@ void set_diff_tensor(float *G, float eig_1, float eig_2, float *eigvec_1, float 
     G[0] = mu_1*a*a + mu_2*c*c;
     G[1] = mu_1*a*b + mu_2*c*d;
     G[2] = G[1];
-    G[3] = mu_1*b*b + mu_2*d*d;    
+    G[3] = mu_1*b*b + mu_2*d*d;  
+    
+    /*G[0] = 1.f;
+    G[1] = 0.f;
+    G[2] = 0.f;
+    G[3] = 1.f;*/
+
 }
 
 __device__
@@ -111,7 +120,6 @@ void matrix_vec_mult(float *A, float *b, float *c)
     c[0] = A[0] * b[0] + A[1] * b[1];
     c[1] = A[2] * b[0] + A[3] * b[1];
 }
-
 
 __global__
 void d_plus_rot(float *a, float *d_grad, float *dx_a, float *dy_a, int dimx, int dimy, int nc)
@@ -160,26 +168,14 @@ void d_plus(float *a, float *G, float *dx_a, float *dy_a, int dimx, int dimy, in
     int k = threadIdx.z + blockDim.z*blockIdx.z;
     // Assumes that dx_a and dy_a are initialized as zero arrays
     float tempx = 0, tempy = 0;
-    float temp_vec[2];
-    float temp_out_vec[2];
-    //float sc, norm=0;
-    int ind = 0;
+    int ind;
     if(i < dimx && j < dimy && k < nc)
     {
         ind = i + j*dimx + dimx*dimy*k;
         if( i < dimx-1 )  tempx=(a[ind+1]-a[ind]);
         if( j < dimy-1 )  tempy=(a[ind+dimx]-a[ind]);
-
-        //norm = sqrtf(tempx*tempx + tempy*tempy);
-        //sc = scalar_func(norm, type, eps);
-        
-        //dx_a[ind] = tempx;
-        //dy_a[ind] = tempy;
-        temp_vec[0] = tempx;
-        temp_vec[1] = tempy;
-        matrix_vec_mult(G, temp_vec, temp_out_vec);
-        dx_a[ind] = temp_out_vec[0];
-        dy_a[ind] = temp_out_vec[1];
+        dx_a[ind] = G[0]*tempx + G[1]*tempy;
+        dy_a[ind] = G[2]*tempx + G[3]*tempy;
     }
    
 }
@@ -259,6 +255,13 @@ void compute_G(float *G, float *m_1, float *m_2, float *m_3, float alpha, float 
         compute_eig(eigvec_1, eigvec_2, a, b, c, d, eig_1, eig_2);
         //set_diff_tensor(float *G, float eig_1, float eig_2, float *eigvec_1 float *eigvec_2, float alpha, float c)
         set_diff_tensor(G, eig_1, eig_2, eigvec_1, eigvec_2, alpha, cG);
+        if(ind == 0)
+        {
+            printf("a is %f, b is %f, c is %f, d is %f \n", a,b,c,d);
+            printf("G1 is %f, G2 is %f, G3 is %f, G4 is %f \n", G[0],G[1],G[2],G[3]);
+            printf("Eigvalue1 is %f, eigvalue2 is %f\n", eig_1, eig_2);
+            printf("Eigvector1 is (%f,%f), eigvector2 is (%f,%f)\n", eigvec_1[0], eigvec_1[1], eigvec_2[0], eigvec_2[1]);
+        }
 
     }
 }
@@ -451,7 +454,7 @@ int main(int argc, char **argv)
     float cG = 5E-6;
     
     //parameters for timestepping
-    float tau = 0.0001;
+    float tau = 0.02;
 
     int size_elem = w*h*nc;
     //float *d_imgOut, *dx_a, *dy_a, *dxx_a, *dyy_a, *div_vec, *result = NULL;
@@ -522,9 +525,6 @@ int main(int argc, char **argv)
 
     Timer timer; timer.start();
 
-
-    
-
     for(int it = 0; it < nit; it++)
     {
         do_GPUconvolution<<<grid, block>>>(d_conv, d_ker_sigma, d_imgIn, rad_sigma, w, h, nc);
@@ -537,7 +537,7 @@ int main(int argc, char **argv)
         // Compute matrix G
         compute_G<<<grid, block>>>(d_G, dd_coeff1, dd_coeff2, dd_coeff3, alpha, cG, w, h, nc);
         // Compute arguments of the divergence function : G*grad(u)
-        d_plus<<<grid, block>>>(d_G, d_imgIn, dx_a, dy_a, w, h, nc);
+        d_plus<<<grid, block>>>( d_imgIn, d_G, dx_a, dy_a, w, h, nc);
         div<<<grid, block>>>(d_div_vec, dx_a, dy_a, w, h, nc);
         time_step<<<grid, block>>>(d_imgIn, d_div_vec, tau, w, h, nc);
     }
@@ -545,6 +545,10 @@ int main(int argc, char **argv)
     timer.end();  float t = timer.get();  // elapsed time in seconds
     cout << "time: " << t*1000 << " ms" << endl;
 
+    cudaMemcpy( m_coord1, dd_coeff1, grid_bytes, cudaMemcpyDeviceToHost );CUDA_CHECK;
+    cudaMemcpy( m_coord2, dd_coeff2, grid_bytes, cudaMemcpyDeviceToHost );CUDA_CHECK;
+    cudaMemcpy( m_coord3, dd_coeff3, grid_bytes, cudaMemcpyDeviceToHost );CUDA_CHECK;
+/*
     float scale = 10.f;
     cv::Mat mCoord1(h,w,CV_32FC1);
     convert_layered_to_mat(mCoord1, m_coord1);
@@ -555,12 +559,16 @@ int main(int argc, char **argv)
     cv::Mat mCoord3(h,w,CV_32FC1);
     convert_layered_to_mat(mCoord3, m_coord3);
     showImage("C3_out", scale*mCoord3, 100+w+30, 100);
-
+*/
+    cudaMemcpy( imgOut, d_imgIn, w*h*nc*sizeof(float), cudaMemcpyDeviceToHost );CUDA_CHECK;
+    // show input image
+    showImage("Input", mIn, 100, 100);  // show at position (x_from_left=100,y_from_above=100)        
+    convert_layered_to_mat(mOut, imgOut);
+    showImage("Output", mOut, 100+w+40, 100);
 
 
     //cudaMemcpy( imgOut, d_dy_conv, nbytes, cudaMemcpyDeviceToHost );CUDA_CHECK;
-    cudaMemcpy( imgOut, d_grad, nbytes, cudaMemcpyDeviceToHost );CUDA_CHECK;
-    showImage("Input", mIn, 100, 100);  // show at position (x_from_left=100,y_from_above=100)
+    
     /*
     cv::Mat mConv(h,w,mIn.type());
     convert_layered_to_mat(mConv, imgOut);

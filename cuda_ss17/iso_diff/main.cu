@@ -17,19 +17,19 @@ __host__ __device__
 float scalar_func(float a, int type, float eps)
 {
     float output;
-    /*if(type == 0)
+    if(type == 0)
     {
         output = 1.0f;
     }
     else if(type == 1)
-    {*/
+    {
         output = 1.0f / (eps>a ? eps : a);
-    /*}
+    }
     else if(type == 2)
     {
         output = exp(-a*a / eps) / eps;
     }
-*/
+
     return output;
 }
 

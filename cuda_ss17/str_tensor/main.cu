@@ -322,17 +322,25 @@ int main(int argc, char **argv)
     // So we will convert as necessary, using interleaved "cv::Mat" for loading/saving/displaying, and layered "float*" for CUDA computations
     convert_mat_to_layered (imgIn, mIn);
 
+    // first kernel
+    float sigma = 0.3;
+    int rad_sigma = ceil(3*sigma);
+    int double_rad_sigma = 2*rad_sigma+1;
+    float *ker_sigma = new float[double_rad_sigma*double_rad_sigma];
+    kernel_comp(ker_sigma, sigma, rad_sigma);
 
-    float std = 1;
-    int rad = ceil(3*std);
-    int double_rad = 2*rad+1;
-    float *ker = new float[double_rad*double_rad];
-    kernel_comp(ker, std, rad);
+    // second kernel
+    float rho = 3;
+    int rad_rho = ceil(3*rho);
+    int double_rad_rho = 2*rad_rho+1;
+    float *ker_rho = new float[double_rad_rho*double_rad_rho];
+    kernel_comp(ker_rho, rho, rad_rho);
+
 
     int size_elem = w*h*nc;
     //float *d_imgOut, *dx_a, *dy_a, *dxx_a, *dyy_a, *div_vec, *result = NULL;
 
-    float *d_ker, *d_conv, *d_imgIn, *d_imgOut, *d_grad, *d_dx_conv, *d_dy_conv, *d_coeff1, *d_coeff2, *d_coeff3, *d_coeff_joint, *d_coeff_temp;
+    float *d_ker_rho, *d_ker_sigma, *d_conv, *d_imgIn, *d_imgOut, *d_grad, *d_dx_conv, *d_dy_conv, *d_coeff1, *d_coeff2, *d_coeff3, *d_coeff_joint, *d_coeff_temp;
     float *dd_coeff1, *dd_coeff2, *dd_coeff3;
     float *m_coord1 = new float[w*h], *m_coord2 = new float[w*h], *m_coord3 = new float[w*h];
     float *dx_a = new float[size_elem];
@@ -348,8 +356,10 @@ int main(int argc, char **argv)
     dim3 block = dim3(dim_x,dim_y,dim_z);
     dim3 grid = dim3((w + block.x -1) / block.x, (h + block.y -1) / block.y, (nc + block.z -1) / block.z);
 
-    cudaMalloc(&d_ker, double_rad*double_rad*sizeof(float));CUDA_CHECK;
-    cudaMemset(d_ker, 0, double_rad*double_rad*sizeof(float));
+    cudaMalloc(&d_ker_sigma, double_rad_sigma*double_rad_sigma*sizeof(float));CUDA_CHECK;
+    cudaMemset(d_ker_sigma, 0, double_rad_sigma*double_rad_sigma*sizeof(float));
+    cudaMalloc(&d_ker_rho, double_rad_rho*double_rad_rho*sizeof(float));CUDA_CHECK;
+    cudaMemset(d_ker_rho, 0, double_rad_rho*double_rad_rho*sizeof(float));
     cudaMalloc(&d_imgOut, nbytes);CUDA_CHECK;
     cudaMemset(d_imgOut, 0, nbytes);
     cudaMalloc(&d_grad, nbytes);CUDA_CHECK;
@@ -362,7 +372,8 @@ int main(int argc, char **argv)
     //cudaMemset(d_conv, 0, nbytes);
     cudaMalloc(&d_imgIn, nbytes);CUDA_CHECK;
     cudaMemset(d_imgIn, 0, nbytes);
-    cudaMemcpy( d_ker, ker, double_rad*double_rad*sizeof(float), cudaMemcpyHostToDevice );CUDA_CHECK;
+    cudaMemcpy( d_ker_sigma, ker_sigma, double_rad_sigma*double_rad_sigma*sizeof(float), cudaMemcpyHostToDevice );CUDA_CHECK;
+    cudaMemcpy( d_ker_rho, ker_rho, double_rad_rho*double_rad_rho*sizeof(float), cudaMemcpyHostToDevice );CUDA_CHECK;
     cudaMemcpy( d_imgIn, imgIn, nbytes, cudaMemcpyHostToDevice );CUDA_CHECK;
     size_t coeff_size = 4*w*h*sizeof(float);
     cudaMalloc(&d_coeff_joint, coeff_size);CUDA_CHECK;
@@ -388,7 +399,7 @@ int main(int argc, char **argv)
     Timer timer; timer.start();
 
 
-    do_GPUconvolution<<<grid, block>>>(d_conv, d_ker, d_imgIn, rad, w, h, nc);
+    do_GPUconvolution<<<grid, block>>>(d_conv, d_ker_sigma, d_imgIn, rad_sigma, w, h, nc);
     timer.end();  float t = timer.get();  // elapsed time in seconds
     cout << "time: " << t*1000 << " ms" << endl;
 
@@ -413,13 +424,13 @@ int main(int argc, char **argv)
 
     //do_GPUconvolution<<<grid, block>>>(d_coeff_temp, d_ker, d_coeff_joint, rad, 2, 2, w*h);
     //cudaMemcpy( coeff_joint, d_coeff_temp, grid_bytes, cudaMemcpyDeviceToHost );CUDA_CHECK;
-    do_GPUconvolution<<<grid, block>>>(dd_coeff1, d_ker, d_coeff1, rad, w, h, 1);
+    do_GPUconvolution<<<grid, block>>>(dd_coeff1, d_ker_rho, d_coeff1, rad_rho, w, h, 1);
     cudaMemcpy( m_coord1, dd_coeff1, grid_bytes, cudaMemcpyDeviceToHost );CUDA_CHECK;
 
-    do_GPUconvolution<<<grid, block>>>(dd_coeff2, d_ker, d_coeff2, rad, w, h, 1);
+    do_GPUconvolution<<<grid, block>>>(dd_coeff2, d_ker_rho, d_coeff2, rad_rho, w, h, 1);
     cudaMemcpy( m_coord2, dd_coeff2, grid_bytes, cudaMemcpyDeviceToHost );CUDA_CHECK;
 
-    do_GPUconvolution<<<grid, block>>>(dd_coeff3, d_ker, d_coeff3, rad, w, h, 1);
+    do_GPUconvolution<<<grid, block>>>(dd_coeff3, d_ker_rho, d_coeff3, rad_rho, w, h, 1);
     cudaMemcpy( m_coord3, dd_coeff3, grid_bytes, cudaMemcpyDeviceToHost );CUDA_CHECK;
 
     float scale = 10.f;
@@ -446,7 +457,8 @@ int main(int argc, char **argv)
 
 
     cudaFree(d_imgOut);CUDA_CHECK;
-    cudaFree(d_ker);CUDA_CHECK;
+    cudaFree(d_ker_rho);CUDA_CHECK;
+    cudaFree(d_ker_sigma);CUDA_CHECK;
     cudaFree(d_conv);CUDA_CHECK;
     cudaFree(d_imgIn);CUDA_CHECK;
 
@@ -475,6 +487,5 @@ int main(int argc, char **argv)
 
     return 0;
 }
-
 
 

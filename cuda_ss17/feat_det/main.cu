@@ -31,7 +31,7 @@ void compute_eig(float a, float b, float c, float d, float &eig1, float &eig2)
     float det = a*d - b*c;
     eig1 = tr/2 + sqrtf(tr*tr/4 - det);
     eig2 = tr/2 - sqrtf(tr*tr/4 - det);
-
+    
 }
 
 __global__

@@ -1,0 +1,110 @@
+Determining if the pthread_create exist failed with the following output:
+Change Dir: /usr/prakt/s150/cuda_ss17/framework/build_make/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_40c6d/fast"
+/usr/bin/make -f CMakeFiles/cmTC_40c6d.dir/build.make CMakeFiles/cmTC_40c6d.dir/build
+make[1]: Entering directory '/usr/prakt/s150/cuda_ss17/framework/build_make/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_40c6d.dir/CheckSymbolExists.c.o
+/usr/bin/cc    -fPIC    -o CMakeFiles/cmTC_40c6d.dir/CheckSymbolExists.c.o   -c /usr/prakt/s150/cuda_ss17/framework/build_make/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+Linking C executable cmTC_40c6d
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_40c6d.dir/link.txt --verbose=1
+/usr/bin/cc  -fPIC     CMakeFiles/cmTC_40c6d.dir/CheckSymbolExists.c.o  -o cmTC_40c6d -rdynamic 
+CMakeFiles/cmTC_40c6d.dir/CheckSymbolExists.c.o: In function `main':
+CheckSymbolExists.c:(.text+0x1b): undefined reference to `pthread_create'
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_40c6d.dir/build.make:97: recipe for target 'cmTC_40c6d' failed
+make[1]: *** [cmTC_40c6d] Error 1
+make[1]: Leaving directory '/usr/prakt/s150/cuda_ss17/framework/build_make/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_40c6d/fast' failed
+make: *** [cmTC_40c6d/fast] Error 2
+
+File /usr/prakt/s150/cuda_ss17/framework/build_make/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <pthread.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_create
+  return ((int*)(&pthread_create))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /usr/prakt/s150/cuda_ss17/framework/build_make/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_10262/fast"
+/usr/bin/make -f CMakeFiles/cmTC_10262.dir/build.make CMakeFiles/cmTC_10262.dir/build
+make[1]: Entering directory '/usr/prakt/s150/cuda_ss17/framework/build_make/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_10262.dir/CheckFunctionExists.c.o
+/usr/bin/cc    -fPIC -DCHECK_FUNCTION_EXISTS=pthread_create   -o CMakeFiles/cmTC_10262.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.5/Modules/CheckFunctionExists.c
+Linking C executable cmTC_10262
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_10262.dir/link.txt --verbose=1
+/usr/bin/cc  -fPIC -DCHECK_FUNCTION_EXISTS=pthread_create    CMakeFiles/cmTC_10262.dir/CheckFunctionExists.c.o  -o cmTC_10262 -rdynamic -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_10262.dir/build.make:97: recipe for target 'cmTC_10262' failed
+make[1]: *** [cmTC_10262] Error 1
+make[1]: Leaving directory '/usr/prakt/s150/cuda_ss17/framework/build_make/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_10262/fast' failed
+make: *** [cmTC_10262/fast] Error 2
+
+
+Determining if the pthread_create exist failed with the following output:
+Change Dir: /usr/prakt/s150/cuda_ss17/str_tensor/build_make/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_4f6d5/fast"
+/usr/bin/make -f CMakeFiles/cmTC_4f6d5.dir/build.make CMakeFiles/cmTC_4f6d5.dir/build
+make[1]: Entering directory '/usr/prakt/s150/cuda_ss17/str_tensor/build_make/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_4f6d5.dir/CheckSymbolExists.c.o
+/usr/bin/cc    -fPIC    -o CMakeFiles/cmTC_4f6d5.dir/CheckSymbolExists.c.o   -c /usr/prakt/s150/cuda_ss17/str_tensor/build_make/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+Linking C executable cmTC_4f6d5
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_4f6d5.dir/link.txt --verbose=1
+/usr/bin/cc  -fPIC     CMakeFiles/cmTC_4f6d5.dir/CheckSymbolExists.c.o  -o cmTC_4f6d5 -rdynamic 
+CMakeFiles/cmTC_4f6d5.dir/CheckSymbolExists.c.o: In function `main':
+CheckSymbolExists.c:(.text+0x1b): undefined reference to `pthread_create'
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_4f6d5.dir/build.make:97: recipe for target 'cmTC_4f6d5' failed
+make[1]: *** [cmTC_4f6d5] Error 1
+make[1]: Leaving directory '/usr/prakt/s150/cuda_ss17/str_tensor/build_make/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_4f6d5/fast' failed
+make: *** [cmTC_4f6d5/fast] Error 2
+
+File /usr/prakt/s150/cuda_ss17/str_tensor/build_make/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <pthread.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_create
+  return ((int*)(&pthread_create))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+
+Determining if the function pthread_create exists in the pthreads failed with the following output:
+Change Dir: /usr/prakt/s150/cuda_ss17/str_tensor/build_make/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_15228/fast"
+/usr/bin/make -f CMakeFiles/cmTC_15228.dir/build.make CMakeFiles/cmTC_15228.dir/build
+make[1]: Entering directory '/usr/prakt/s150/cuda_ss17/str_tensor/build_make/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_15228.dir/CheckFunctionExists.c.o
+/usr/bin/cc    -fPIC -DCHECK_FUNCTION_EXISTS=pthread_create   -o CMakeFiles/cmTC_15228.dir/CheckFunctionExists.c.o   -c /usr/share/cmake-3.5/Modules/CheckFunctionExists.c
+Linking C executable cmTC_15228
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_15228.dir/link.txt --verbose=1
+/usr/bin/cc  -fPIC -DCHECK_FUNCTION_EXISTS=pthread_create    CMakeFiles/cmTC_15228.dir/CheckFunctionExists.c.o  -o cmTC_15228 -rdynamic -lpthreads 
+/usr/bin/ld: cannot find -lpthreads
+collect2: error: ld returned 1 exit status
+CMakeFiles/cmTC_15228.dir/build.make:97: recipe for target 'cmTC_15228' failed
+make[1]: *** [cmTC_15228] Error 1
+make[1]: Leaving directory '/usr/prakt/s150/cuda_ss17/str_tensor/build_make/CMakeFiles/CMakeTmp'
+Makefile:126: recipe for target 'cmTC_15228/fast' failed
+make: *** [cmTC_15228/fast] Error 2
+
+

@@ -181,8 +181,6 @@ int main(int argc, char **argv)
     cout << "image: " << w << " x " << h << endl;
 
 
-
-
     // Set the output image format
     // ###
     // ###
@@ -193,9 +191,6 @@ int main(int argc, char **argv)
     //cv::Mat mOut(h,w,CV_32FC3);    // mOut will be a color image, 3 layers
     //cv::Mat mOut(h,w,CV_32FC1);    // mOut will be a grayscale image, 1 layer
     // ### Define your own output images here as needed
-
-
-
 
     // Allocate arrays
     // input/output image width: w
@@ -208,9 +203,6 @@ int main(int argc, char **argv)
 
     // allocate raw output array (the computation result will be stored in this array, then later converted to mOut for displaying)
     float *imgOut = new float[(size_t)w*h*mOut.channels()];
-
-
-
 
     // For camera mode: Make a loop to read in camera frames
 #ifdef CAMERA
@@ -254,36 +246,26 @@ int main(int argc, char **argv)
     int dim_y = 4;
     int dim_z = 4;
 
-
-
     // Initialize stuff
     dim3 block = dim3(dim_x,dim_y,dim_z);
     dim3 grid = dim3((w + block.x -1) / block.x, (h + block.y -1) / block.y, (nc + block.z -1) / block.z);
 
-    // Shared memory parameters
-
-
-
+    // memory allocation
     cudaMalloc(&d_ker, double_rad*double_rad*sizeof(float));CUDA_CHECK;
     cudaMalloc(&d_imgOut, nbytes);CUDA_CHECK;
     cudaMalloc(&d_conv, nbytes);CUDA_CHECK;
     cudaMemset(d_conv, 0, nbytes);CUDA_CHECK;
     cudaMalloc(&d_imgIn, nbytes);CUDA_CHECK;
-
     cudaMemcpy( d_ker, ker, double_rad*double_rad*sizeof(float), cudaMemcpyHostToDevice );CUDA_CHECK;
     cudaMemcpy( d_imgIn, imgIn, nbytes, cudaMemcpyHostToDevice );CUDA_CHECK;
+    
     Timer timer; timer.start();
-    CUDA_CHECK;
+    // Call kernel with size of shared memory as parameter
     size_t shmBytes = (dim_x+2*rad)*(dim_y+2*rad)*sizeof(float);
-    //int shmBytes = (dim_x+2*rad)*(dim_y+2*rad);
-        // void do_GPUconvolution(float *conv, float *ker, float *a, int r, int dimx, int dimy, int nc)
-        //void convolutionkernel(float *d_imgIn, float *d_imgOut, float *d_kernel, int w, int h, int nc, int radius) 
     convolutionkernel<<<grid, block, shmBytes>>>(d_conv, d_ker, d_imgIn, rad, w, h, nc);CUDA_CHECK;
-    //do_GPUconvolution<<<grid, block, shmBytes>>>(d_conv, d_ker, d_imgIn, rad, w, h, nc);CUDA_CHECK;
-    //do_GPUconvolution<<<grid, block>>>(d_conv, d_ker, d_imgIn, rad, w, h, nc);CUDA_CHECK;
-    CUDA_CHECK;    
     timer.end();  float t = timer.get();  // elapsed time in seconds
     cout << "time: " << t*1000 << " ms" << endl;
+    
     cudaMemcpy( conv, d_conv, nbytes, cudaMemcpyDeviceToHost );CUDA_CHECK;
     showImage("Input", mIn, 100, 100);  // show at position (x_from_left=100,y_from_above=100)
     cv::Mat mConv(h,w,mIn.type());

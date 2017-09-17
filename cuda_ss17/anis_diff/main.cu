@@ -52,8 +52,8 @@ void compute_eig(float *eigvec_1, float *eigvec_2, float a, float b, float c, fl
     {
         eigvec_1[0] = 1;
         eigvec_1[1] = 0;
-        eigvec_2[0] = 1;
-        eigvec_2[1] = 0;
+        eigvec_2[0] = 0;
+        eigvec_2[1] = 1;
     }
     
 }
@@ -91,7 +91,7 @@ void div(float *div_vec, float *dx_a, float *dy_a, int dimx, int dimy, int nc)
         if(i > 0) tempx=(dx_a[ind]-dx_a[ind-1]);
         if(j > 0 ) tempy=(dy_a[ind]-dy_a[ind-dimx]);
         div_vec[ind] = tempx + tempy;
-        printf("Divergence in thread 0 is %f\n", div_vec[ind]);
+        //if(ind == 0)printf("Divergence in thread 0 is %.8f\n",div_vec[ind]);
     }
 }
 
@@ -255,13 +255,13 @@ void compute_G(float *G, float *m_1, float *m_2, float *m_3, float alpha, float 
         compute_eig(eigvec_1, eigvec_2, a, b, c, d, eig_1, eig_2);
         //set_diff_tensor(float *G, float eig_1, float eig_2, float *eigvec_1 float *eigvec_2, float alpha, float c)
         set_diff_tensor(G, eig_1, eig_2, eigvec_1, eigvec_2, alpha, cG);
-        if(ind == 0)
+        /*if(ind == 0)
         {
             printf("a is %f, b is %f, c is %f, d is %f \n", a,b,c,d);
-            printf("G1 is %f, G2 is %f, G3 is %f, G4 is %f \n", G[0],G[1],G[2],G[3]);
-            printf("Eigvalue1 is %f, eigvalue2 is %f\n", eig_1, eig_2);
-            printf("Eigvector1 is (%f,%f), eigvector2 is (%f,%f)\n", eigvec_1[0], eigvec_1[1], eigvec_2[0], eigvec_2[1]);
-        }
+            printf("G1 is %.8f, G2 is %.8f, G3 is %.8f, G4 is %.8f \n", G[0],G[1],G[2],G[3]);
+            printf("Eigvalue1 is %.8f, eigvalue2 is %.8f\n", eig_1, eig_2);
+            printf("Eigvector1 is (%f,%f), eigvalue2 is (%f,%f)\n", eigvec_1[0], eigvec_1[1], eigvec_2[0], eigvec_2[1]);
+        }*/
 
     }
 }
@@ -450,11 +450,12 @@ int main(int argc, char **argv)
     kernel_comp(ker_rho, rho, rad_rho);
 
     // Matrx G parameters
-    float alpha =0.5;
+    float alpha = 0.9;
     float cG = 5E-6;
+    //float cG = 0.1;
     
     //parameters for timestepping
-    float tau = 0.02;
+    float tau = 0.1;
 
     int size_elem = w*h*nc;
     //float *d_imgOut, *dx_a, *dy_a, *dxx_a, *dyy_a, *div_vec, *result = NULL;

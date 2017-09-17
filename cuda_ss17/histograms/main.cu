@@ -11,104 +11,61 @@
 #include <iostream>
 using namespace std;
 
-__global__
-void convolutionkernel(float *conv, float *ker,float *a, int rad, int w, int h, int nc) 
+// uncomment to use the camera
+//#define CAMERA
+
+
+__global__ void histogram_global(float *d_imgIn, int *d_hist, int w, int h, int nc)
 {
-    extern __shared__ float sh_data[];
-    //Block indices
-    int block_x = blockDim.x * blockIdx.x;
-    int block_y = blockDim.y * blockIdx.y;
+    int x = threadIdx.x + blockDim.x * blockIdx.x;
+    int y = threadIdx.y + blockDim.y * blockIdx.y;
+    int z = threadIdx.z + blockDim.z * blockIdx.z;
+    
+	if (x < w && y < h && z < nc)
+	{
+		int ind = x + w*y + w*h*z; 
+		int index = d_imgIn[ind]*255.f;
+		atomicAdd(&d_hist[index], 1);
+	}
+}
 
-    // Global indices
-    int x = threadIdx.x + block_x;
-    int y = threadIdx.y + block_y;
+__global__ void histogram_shared(float *d_imgIn, int *d_hist, int dimx, int dimy, int nc)
+{
+    int num_bin = 256;
+    __shared__ int hist[256];
 
-    // Shared memory dimensions
-    int sh_w = blockDim.x + 2 * rad;
-    int sh_h = blockDim.y + 2 * rad;
-    int sh_size = sh_w * sh_h;
+    int i = threadIdx.x + blockDim.x * blockIdx.x;
+    int j = threadIdx.y + blockDim.y * blockIdx.y;
+    int k = threadIdx.z + blockDim.z * blockIdx.z;
 
-    // Division coefficients
-    int block_size = blockDim.x * blockDim.y;
-    int quot = sh_size / block_size;
-    int rest = (sh_size % block_size);
-    int local_ind = threadIdx.x + blockDim.x * threadIdx.y;
 
-    // double radius +1
-    int drad = 2 * rad + 1; 
-    if (local_ind == 0){
-        quot = quot + rest;
-        rest = 0;
-    }
-
-    int pos, xi, yi;
-    float temp = 0.f;
-    // Repeat per channel
-    for (int z = 0; z < nc; z++) 
+    if(i < dimx && j < dimy && k < nc)
     { 
-        for (int i=0; i<quot; i++)
+        if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) 
         {
-            pos = local_ind*quot + rest + i;
-            // Local coordinates
-            xi = (pos%sh_w) + (block_x-rad); 
-            yi = (pos/sh_w) + (block_y-rad);
-            // Local clamping
-            xi = max(0, min(w-1,xi)); 
-            yi = max(0, min(h-1,yi));
-            // Assign shared mem
-            sh_data[pos] = a[xi + (size_t)w*yi + w*h*z];
+            for(int it = 0; it < num_bin; it++)
+                hist[it] = 0;
         }
         
         __syncthreads();
-        
-        // Do convolution
-        if (x < w && y < h) 
+
+        int ind = i + j * dimx + dimx*dimy*k;
+        int bin_label = d_imgIn[ind]*255.f;
+        atomicAdd(&hist[bin_label], 1);
+
+        __syncthreads();
+
+
+        if(threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
         {
-            int sh_index = 0;
-            temp = 0.f;
-            for (int ii = -rad; ii < rad + 1; ii++) 
-            {
-                for (int jj = -rad; jj < rad + 1; jj++) 
-                {
-                    sh_index = (threadIdx.x + ii + rad) + (threadIdx.y + jj + rad) *( blockDim.x + 2*rad);
-                    temp += sh_data[sh_index] *  ker[(ii + rad + (drad) * (jj + rad))];
-                }
-            }
-
-            __syncthreads();
-            
-            conv[x + y * w + z * w * h] = temp;
-
+            for(int it = 0; it < num_bin; it++)
+                atomicAdd(&d_hist[it], hist[it]);
         }
-
-    }
-}
-
-void kernel_comp(float *ker, float std, int radius)
-{
-    float coeff = 1 / (2 * M_PI * std * std);
-    float arg;
-    int rad = radius*2+1;
-    int in, jn;
-    float sum= 0;
-
-    for(int i=0; i<rad; i++)
-        for(int j=0; j<rad; j++)
-        {   in = i-radius; jn = j-radius;
-            arg = -( in*in + jn*jn ) / (2*std*std);
-            ker[i + rad*j] = coeff * expf(arg);
-            sum += ker[i + rad*j];
-        }
-
-    for(int i=0; i<rad; i++)
-        for(int j=0; j<rad; j++)
-            ker[i + rad*j] /= sum;
-
+        __syncthreads();
+    } 
 }
 
 
-// uncomment to use the camera
-//#define CAMERA
 
 int main(int argc, char **argv)
 {
@@ -209,6 +166,21 @@ int main(int argc, char **argv)
     // allocate raw output array (the computation result will be stored in this array, then later converted to mOut for displaying)
     float *imgOut = new float[(size_t)w*h*mOut.channels()];
 
+    int hist_size = 256;
+    int *hist_global = new int[hist_size];
+    int *hist_shared = new int[hist_size];
+    
+	//allocate memory on device
+	float *d_imgIn;
+	int *d_hist;
+	int imgSize = (size_t)w*h*nc;
+	
+	cudaMalloc(&d_imgIn, imgSize*sizeof(float)); CUDA_CHECK;
+	cudaMalloc(&d_hist, hist_size*sizeof(int)); CUDA_CHECK;
+
+    dim3 block = dim3(16, 4, 4);
+    dim3 grid = dim3((w + block.x - 1) / block.x, (h + block.y - 1) / block.y, (nc + block.z - 1)/block.z);
+    
 
 
 
@@ -233,67 +205,35 @@ int main(int argc, char **argv)
     // So we will convert as necessary, using interleaved "cv::Mat" for loading/saving/displaying, and layered "float*" for CUDA computations
     convert_mat_to_layered (imgIn, mIn);
 
+	//copy host memory to device
+	cudaMemcpy(d_imgIn, imgIn, imgSize*sizeof(float), cudaMemcpyHostToDevice); CUDA_CHECK;
+    cudaMemset(d_hist, 0, hist_size*sizeof(int));
+    
 
-    // ###
-    // ### TODO: Main computation
+    Timer timer;
+    
+    timer.start();
+    histogram_global<<<grid,block>>> (d_imgIn, d_hist, w, h, nc);
+    timer.end();  float t = timer.get(); 
+    cout << "Global time: " << t*1000 << " ms" << endl;
+    cudaMemcpy(hist_global, d_hist, hist_size * sizeof(int), cudaMemcpyDeviceToHost); CUDA_CHECK;
 
-    // Compute kernel
-    float std = 10;
-    int rad = ceil(3*std);
-    int double_rad = 2*rad+1;
-    float *ker = new float[double_rad*double_rad];
-    kernel_comp(ker, std, rad);
+    timer.start();
+    histogram_shared<<<grid,block>>> (d_imgIn, d_hist, w, h, nc);
+    timer.end();  t = timer.get(); 
+    cout << "Shared time: " << t*1000 << " ms" << endl;
+    cudaMemcpy(hist_shared, d_hist, hist_size * sizeof(int), cudaMemcpyDeviceToHost); CUDA_CHECK;
+	
+    showHistogram256("Histogram global", hist_global, 500, 100);
+    showHistogram256("Histogram shared", hist_shared, 500, 300);
+	
 
-    // Initialize size variables
-    int size_elem = w*h*nc;
-    float *d_ker, *d_conv, *d_imgIn, *d_imgOut;
-    float *conv = new float[size_elem];
-    size_t nbytes = size_t(size_elem)*sizeof(float);
-
-    int dim_x = 16;
-    int dim_y = 4;
-    int dim_z = 4;
-
-
-
-    // Initialize stuff
-    dim3 block = dim3(dim_x,dim_y,dim_z);
-    dim3 grid = dim3((w + block.x -1) / block.x, (h + block.y -1) / block.y, (nc + block.z -1) / block.z);
-
-    // Shared memory parameters
-
-
-
-    cudaMalloc(&d_ker, double_rad*double_rad*sizeof(float));CUDA_CHECK;
-    cudaMalloc(&d_imgOut, nbytes);CUDA_CHECK;
-    cudaMalloc(&d_conv, nbytes);CUDA_CHECK;
-    cudaMemset(d_conv, 0, nbytes);CUDA_CHECK;
-    cudaMalloc(&d_imgIn, nbytes);CUDA_CHECK;
-
-    cudaMemcpy( d_ker, ker, double_rad*double_rad*sizeof(float), cudaMemcpyHostToDevice );CUDA_CHECK;
-    cudaMemcpy( d_imgIn, imgIn, nbytes, cudaMemcpyHostToDevice );CUDA_CHECK;
-    Timer timer; timer.start();
-    CUDA_CHECK;
-    size_t shmBytes = (dim_x+2*rad)*(dim_y+2*rad)*sizeof(float);
-    //int shmBytes = (dim_x+2*rad)*(dim_y+2*rad);
-        // void do_GPUconvolution(float *conv, float *ker, float *a, int r, int dimx, int dimy, int nc)
-        //void convolutionkernel(float *d_imgIn, float *d_imgOut, float *d_kernel, int w, int h, int nc, int radius) 
-    convolutionkernel<<<grid, block, shmBytes>>>(d_conv, d_ker, d_imgIn, rad, w, h, nc);CUDA_CHECK;
-    //do_GPUconvolution<<<grid, block, shmBytes>>>(d_conv, d_ker, d_imgIn, rad, w, h, nc);CUDA_CHECK;
-    //do_GPUconvolution<<<grid, block>>>(d_conv, d_ker, d_imgIn, rad, w, h, nc);CUDA_CHECK;
-    CUDA_CHECK;    
-    timer.end();  float t = timer.get();  // elapsed time in seconds
-    cout << "time: " << t*1000 << " ms" << endl;
-    cudaMemcpy( conv, d_conv, nbytes, cudaMemcpyDeviceToHost );CUDA_CHECK;
+    // show input image
     showImage("Input", mIn, 100, 100);  // show at position (x_from_left=100,y_from_above=100)
-    cv::Mat mConv(h,w,mIn.type());
-    convert_layered_to_mat(mConv, conv);
-    showImage("Output", mConv, 100+w+40, 100);
 
-    cudaFree(d_imgOut);CUDA_CHECK;
-    cudaFree(d_ker);CUDA_CHECK;
-    cudaFree(d_conv);CUDA_CHECK;
-    cudaFree(d_imgIn);CUDA_CHECK;
+    // show output image: first convert to interleaved opencv format from the layered raw array
+
+    // ### Display your own output images here as needed
 
 #ifdef CAMERA
     // end of camera loop
